@@ -10,6 +10,50 @@ body {
 }
 
 /*
+ * Basic markdown styling for the rendered document preview. Tailwind's
+ * preflight strips heading/list styles, so restore the essentials here.
+ */
+.document-preview h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+}
+.document-preview h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 1.25rem 0 0.5rem;
+}
+.document-preview h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 1rem 0 0.4rem;
+}
+.document-preview p {
+  margin: 0.6rem 0;
+}
+.document-preview ul,
+.document-preview ol {
+  margin: 0.6rem 0;
+  padding-left: 1.4rem;
+  list-style: revert;
+}
+.document-preview a {
+  color: #209dd7;
+  text-decoration: underline;
+}
+.document-preview table {
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  width: 100%;
+}
+.document-preview th,
+.document-preview td {
+  border: 1px solid #cbd5e1;
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+}
+
+/*
  * Print / "Save as PDF" pipeline. When printing we hide all page chrome and
  * reveal only the rendered agreement, positioned to fill the page. This keeps
  * the PDF text crisp and selectable (no rasterization) with no extra deps.
@@ -23,27 +67,27 @@ body {
     visibility: hidden;
   }
 
-  .nda-document,
-  .nda-document * {
+  .document-preview,
+  .document-preview * {
     visibility: visible;
   }
 
-  .nda-document {
+  .document-preview {
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
     max-width: none;
     margin: 0;
-    padding: 0;
+    border: none;
     box-shadow: none;
     /* Preserve checkbox fills and shaded values in the printed output. */
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  /* Avoid breaking a numbered clause across two pages where possible. */
-  .nda-standard-terms li {
+  /* Avoid breaking a list item across two pages where possible. */
+  .document-preview li {
     break-inside: avoid;
   }
 

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import Home from "./page";
 import { setUser } from "@/lib/auth";
 
@@ -7,61 +7,64 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 
-function getDocument(container: HTMLElement): HTMLElement {
-  const doc = container.querySelector(".nda-document");
-  if (!doc) throw new Error("NDA document preview not found");
-  return doc as HTMLElement;
+// Route fetch by URL: the catalog list and a document's template markdown.
+function stubFetch() {
+  const fetchMock = vi.fn((url: string) => {
+    if (url === "/api/catalog") {
+      return Promise.resolve({
+        ok: true,
+        json: async () => [
+          { id: "Mutual-NDA", name: "Mutual NDA", description: "An NDA." },
+        ],
+      });
+    }
+    if (url === "/api/documents/Mutual-NDA") {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          id: "Mutual-NDA",
+          name: "Mutual NDA",
+          markdown: "# Standard Terms\n\nConfidential.",
+        }),
+      });
+    }
+    throw new Error(`unexpected fetch: ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
 }
 
-describe("Mutual NDA creator page", () => {
+describe("Document creator page", () => {
   // The page is gated behind the fake login, so seed a session first.
   beforeEach(() => {
     setUser({ email: "test@example.com", name: "Tester" });
+    stubFetch();
   });
 
-  it("renders both the form heading and the document preview", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("shows the catalog picker with documents to choose from", async () => {
     render(<Home />);
     expect(
-      screen.getByRole("heading", { name: "Mutual NDA Creator" })
+      screen.getByRole("heading", { name: "Choose a document" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Mutual Non-Disclosure Agreement" })
+      await screen.findByRole("button", { name: /Mutual NDA/i }),
     ).toBeInTheDocument();
   });
 
-  it("flows a typed governing law into the rendered Standard Terms", () => {
+  it("opens the workspace and renders the template after selecting a document", async () => {
     const { container } = render(<Home />);
-    const doc = getDocument(container);
 
-    // Before input, the Standard Terms show the bracketed placeholder.
-    expect(doc.textContent).toContain("[Governing Law]");
+    fireEvent.click(await screen.findByRole("button", { name: /Mutual NDA/i }));
 
-    fireEvent.change(screen.getByLabelText("Governing Law (State)"), {
-      target: { value: "Delaware" },
+    await waitFor(() => {
+      const preview = container.querySelector(".document-preview");
+      expect(preview?.textContent).toContain("Standard Terms");
     });
-
-    expect(doc.textContent).not.toContain("[Governing Law]");
-    expect(doc.textContent).toContain("laws of the State of Delaware");
-  });
-
-  it("shows a placeholder for the effective date until one is chosen", () => {
-    const { container } = render(<Home />);
-    expect(getDocument(container).textContent).toContain("[Effective Date]");
-  });
-
-  it("renders the correct §5 wording when the MNDA continues until terminated", () => {
-    const { container } = render(<Home />);
-    const doc = getDocument(container);
-
-    fireEvent.click(
-      screen.getByRole("radio", { name: /continues until terminated/i })
-    );
-
-    // The grammatically broken "expires at the end of until terminated" must
-    // never appear; the clause should read as a coherent sentence instead.
-    expect(doc.textContent).not.toContain("expires at the end of until");
-    expect(doc.textContent).toContain(
-      "and continues until terminated in accordance with the terms of this MNDA"
-    );
+    expect(
+      screen.getByRole("button", { name: /Download PDF/i }),
+    ).toBeInTheDocument();
   });
 });

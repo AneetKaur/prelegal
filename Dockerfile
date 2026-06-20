@@ -21,12 +21,15 @@ WORKDIR /app
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
-# App code and the exported frontend.
+# App code, the document catalog/templates, and the exported frontend.
 COPY backend/app ./app
+COPY catalog.json ./catalog.json
+COPY templates ./templates
 COPY --from=frontend /frontend/out ./frontend_out
 
 ENV FRONTEND_DIR=/app/frontend_out
 ENV DATABASE_PATH=/app/prelegal.db
+ENV DOCUMENTS_ROOT=/app
 EXPOSE 8000
 
 CMD ["uv", "run", "--no-dev", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
