@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app import db
-from app.routes import auth, chat, health
+from app.routes import auth, chat, documents, health
 
 # Load OPENROUTER_API_KEY (and any other .env values) for local dev. In Docker
 # the key is injected via the environment, so a missing .env file is fine.
@@ -37,6 +37,7 @@ app = FastAPI(title="Prelegal", lifespan=lifespan)
 
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(documents.router)
 app.include_router(chat.router)
 
 # Mount the static frontend last so /api routes take precedence. html=True serves

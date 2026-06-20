@@ -1,28 +1,38 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { NdaFormData } from "@/lib/nda";
-import { postChat, type ChatMessage } from "@/lib/chat";
+import {
+  postChat,
+  type ChatMessage,
+  type ChatResponse,
+} from "@/lib/documents";
 
 interface ChatPanelProps {
-  data: NdaFormData;
-  onChange: (data: NdaFormData) => void;
+  /** Chosen document, or null while the user is still picking one. */
+  documentId: string | null;
+  /** Current document markdown (fill mode); sent back each turn so edits accrue. */
+  documentMarkdown: string;
+  /** First assistant message shown in the thread (display-only, not sent). */
+  greeting: string;
+  /** Called after each successful turn with the backend's response. */
+  onResult: (res: ChatResponse) => void;
 }
 
-const GREETING: ChatMessage = {
-  role: "assistant",
-  content:
-    "Hi! I'll help you put together a Mutual NDA. To start, what's the purpose " +
-    "of the agreement — what will the two parties be sharing or evaluating?",
-};
-
 /**
- * Conversational front-end for the NDA. The assistant asks about the document
- * and the answers populate `data` (the live preview), which the user can still
- * fine-tune in the form below.
+ * Conversational front-end shared by both stages: picking a document (selection
+ * mode, documentId null) and filling it in (fill mode). The parent owns the
+ * document state and reacts to each turn via `onResult`.
  */
-export default function ChatPanel({ data, onChange }: ChatPanelProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([GREETING]);
+export default function ChatPanel({
+  documentId,
+  documentMarkdown,
+  greeting,
+  onResult,
+}: ChatPanelProps) {
+  // `messages` holds only the real exchange. The greeting is display-only UI
+  // text the assistant never produced, so it's rendered separately and never
+  // sent to the backend as history.
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
@@ -40,12 +50,9 @@ export default function ChatPanel({ data, onChange }: ChatPanelProps) {
     setInput("");
     setLoading(true);
     try {
-      // The greeting is display-only UI text the assistant never produced, so
-      // don't send it as part of the conversation history.
-      const history = next.filter((m) => m !== GREETING);
-      const { reply, fields } = await postChat(history, data);
-      setMessages([...next, { role: "assistant", content: reply }]);
-      onChange(fields);
+      const res = await postChat(next, documentId, documentMarkdown);
+      setMessages([...next, { role: "assistant", content: res.reply }]);
+      onResult(res);
     } catch {
       setMessages([
         ...next,
@@ -66,11 +73,21 @@ export default function ChatPanel({ data, onChange }: ChatPanelProps) {
           AI Assistant
         </h2>
         <p className="text-xs text-slate-500">
-          Describe your NDA and I&apos;ll fill in the details below.
+          {documentId
+            ? "Answer my questions and I'll fill in your document."
+            : "Tell me what kind of document you need."}
         </p>
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+        <div className="flex justify-start">
+          <span
+            className="max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm"
+            style={{ backgroundColor: "#f1f5f9", color: "#1e293b" }}
+          >
+            {greeting}
+          </span>
+        </div>
         {messages.map((m, i) => (
           <div
             key={i}
@@ -111,7 +128,7 @@ export default function ChatPanel({ data, onChange }: ChatPanelProps) {
         <input
           id="chat-input"
           className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-          placeholder="Type your answer…"
+          placeholder="Type your message…"
           value={input}
           disabled={loading}
           onChange={(e) => setInput(e.target.value)}

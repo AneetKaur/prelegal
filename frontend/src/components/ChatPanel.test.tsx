@@ -1,50 +1,94 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import ChatPanel from "./ChatPanel";
-import { defaultNdaForm } from "@/lib/nda";
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderPanel() {
-  const onChange = vi.fn();
-  render(<ChatPanel data={defaultNdaForm()} onChange={onChange} />);
-  return onChange;
-}
-
 describe("ChatPanel", () => {
-  it("shows the assistant greeting on mount", () => {
-    renderPanel();
-    expect(screen.getByText(/help you put together a Mutual NDA/i)).toBeInTheDocument();
+  it("shows the greeting on mount", () => {
+    render(
+      <ChatPanel
+        documentId={null}
+        documentMarkdown=""
+        greeting="Pick a document to begin."
+        onResult={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Pick a document to begin.")).toBeInTheDocument();
   });
 
-  it("posts the message, renders the reply, and pushes returned fields up", async () => {
-    const updated = { ...defaultNdaForm(), governingLaw: "Delaware" };
+  it("posts the message, renders the reply, and reports the result", async () => {
+    const response = {
+      reply: "Sounds like a CSA.",
+      documentId: "CSA",
+      documentMarkdown: "",
+    };
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ reply: "Using Delaware law.", fields: updated }),
+      json: async () => response,
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const onChange = renderPanel();
+    const onResult = vi.fn();
+    render(
+      <ChatPanel
+        documentId={null}
+        documentMarkdown=""
+        greeting="Hi"
+        onResult={onResult}
+      />,
+    );
     fireEvent.change(screen.getByLabelText(/message/i), {
-      target: { value: "Delaware" },
+      target: { value: "cloud service agreement" },
     });
     fireEvent.click(screen.getByRole("button", { name: /send/i }));
 
-    expect(await screen.findByText("Using Delaware law.")).toBeInTheDocument();
+    expect(await screen.findByText("Sounds like a CSA.")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/chat",
       expect.objectContaining({ method: "POST" }),
     );
-    await waitFor(() => expect(onChange).toHaveBeenCalledWith(updated));
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith(response));
+  });
+
+  it("never sends the display-only greeting in the history", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ reply: "ok", documentId: "CSA", documentMarkdown: "# x" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <ChatPanel
+        documentId="CSA"
+        documentMarkdown="# Doc"
+        greeting="GREETING TEXT"
+        onResult={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText(/message/i), {
+      target: { value: "hello" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(sent.messages).toEqual([{ role: "user", content: "hello" }]);
   });
 
   it("shows an error message when the request fails", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 502 }));
 
-    renderPanel();
+    render(
+      <ChatPanel
+        documentId="CSA"
+        documentMarkdown="# Doc"
+        greeting="Hi"
+        onResult={vi.fn()}
+      />,
+    );
     fireEvent.change(screen.getByLabelText(/message/i), {
       target: { value: "hi" },
     });

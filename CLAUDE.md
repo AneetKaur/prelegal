@@ -4,7 +4,7 @@
 This is a SaaS product to allow users to draft legal agreements based on templates in the templates directory. The use can carry AI chat in order to establish what document they want and how to fill in the fields. The available documents are covered in catalog.json file in the project root, incliuded here: 
 @catalog.json
 
-The v1 technical foundation (frontend + backend + temporary database) is now in place. The product currently supports only the Mutual NDA document and has no AI chat yet — see Implementation Status at the end of this file.
+The v1 technical foundation (frontend + backend + temporary database) is now in place, with AI chat that supports every document in the catalog — see Implementation Status at the end of this file.
 
 ## Development process
 When instrcuted to build a feature:
@@ -53,14 +53,15 @@ Backend available at http://localhost:8000
   - **Fake login** only (no real auth): `POST /api/login` upserts the user. Frontend has a `/login` screen, an auth guard on `/`, and a logout button. Session in localStorage, read via a `useSyncExternalStore` hook (`frontend/src/lib/auth.ts`).
   - Multi-stage `Dockerfile` + `scripts/{start,stop}-{mac,linux}.sh` and `{start,stop}-windows.ps1`.
   - CI (`.github/workflows/ci.yml`): separate frontend (lint/test/build) and backend (uv + pytest) jobs.
-- **KAN-5** — AI chat for the Mutual NDA:
-  - `POST /api/chat` (`backend/app/routes/chat.py`) sends the conversation + current field values to OpenRouter (`openai/gpt-oss-120b:free`) with JSON-schema Structured Outputs and returns `{reply, fields}`. LLM call isolated in `_call_openrouter` for mocking.
-  - `OPENROUTER_API_KEY` loaded from `.env` via `python-dotenv` for local dev; start scripts pass `--env-file .env` into the container (the key is never baked into the image).
-  - Frontend `ChatPanel` (`frontend/src/components/ChatPanel.tsx`) sits above the form; replies fill `NdaFormData` live. The structured form remains editable for manual corrections (hybrid). Tests mock `fetch`/`_call_openrouter`.
+- **KAN-5** — AI chat for the Mutual NDA (NDA-specific field/schema approach; **superseded by KAN-7**, which generalized chat to all documents). `OPENROUTER_API_KEY` is loaded from `.env` via `python-dotenv` for local dev; start scripts pass `--env-file .env` into the container (the key is never baked into the image).
+- **KAN-7** — Expanded to **all catalog documents** via a generic, chat-driven markdown approach:
+  - `backend/app/documents.py` loads `catalog.json` + `templates/*.md` from `DOCUMENTS_ROOT` (repo root locally; `/app` in Docker). `id` = template filename without `.md`.
+  - `GET /api/catalog` lists documents; `GET /api/documents/{id}` returns the pristine template markdown (the blank starting point).
+  - `POST /api/chat` (`backend/app/routes/chat.py`) has two modes branching on `documentId`: **selection** (no id → `{reply, documentId}`; suggests the closest catalog doc for unsupported requests) and **fill** (id set → the LLM returns small find/replace edits applied server-side via `apply_replacements`, returning the updated `documentMarkdown`). Full-document regeneration was tried first but is too slow/unreliable for large templates (e.g. CSA ~45KB); find/replace keeps output tiny. Uses OpenRouter (`openai/gpt-oss-120b:free`) with JSON-schema Structured Outputs, `max_tokens=8000`; LLM call isolated in `_call_openrouter` for mocking.
+  - Frontend: `CatalogPicker` (grid + intake chat) → workspace with a generic `ChatPanel` (selection + fill modes), `DocumentPreview` (renders markdown via `react-markdown` + `remark-gfm` + `rehype-raw`), and a raw-markdown editor for manual edits. PDF via browser print (`.document-preview` is the print target). The NDA-specific `NdaForm`/`NdaDocument`/`NdaFields` were removed in favour of this single path.
 
 ### Not yet built
 - Real authentication / sign-up (login is intentionally fake for now).
-- Documents other than the Mutual NDA from `catalog.json`.
 
 ### Dev notes
 - `uv` installs to `~/.local/bin`. Run the backend locally with `uv run uvicorn app.main:app --reload` (from `backend/`); build the frontend with `npm run build` (emits `frontend/out/`, served by the backend).
