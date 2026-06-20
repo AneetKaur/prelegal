@@ -1,0 +1,12 @@
+# Build artifacts and local state — rebuilt inside the image.
+**/node_modules
+**/.next
+**/out
+**/.venv
+**/__pycache__
+**/*.db
+.git
+.github
+.claude
+.env
+templates
