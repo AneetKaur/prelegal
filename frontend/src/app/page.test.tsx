@@ -1,6 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import Home from "./page";
+import { setUser } from "@/lib/auth";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}));
 
 function getDocument(container: HTMLElement): HTMLElement {
   const doc = container.querySelector(".nda-document");
@@ -9,6 +14,11 @@ function getDocument(container: HTMLElement): HTMLElement {
 }
 
 describe("Mutual NDA creator page", () => {
+  // The page is gated behind the fake login, so seed a session first.
+  beforeEach(() => {
+    setUser({ email: "test@example.com", name: "Tester" });
+  });
+
   it("renders both the form heading and the document preview", () => {
     render(<Home />);
     expect(
