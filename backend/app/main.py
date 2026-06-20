@@ -8,11 +8,16 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app import db
-from app.routes import auth, health
+from app.routes import auth, chat, health
+
+# Load OPENROUTER_API_KEY (and any other .env values) for local dev. In Docker
+# the key is injected via the environment, so a missing .env file is fine.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 # Location of the exported frontend. Defaults to ../frontend/out for local dev;
 # the Docker image overrides this with the copied build.
@@ -32,6 +37,7 @@ app = FastAPI(title="Prelegal", lifespan=lifespan)
 
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(chat.router)
 
 # Mount the static frontend last so /api routes take precedence. html=True serves
 # index.html for directory paths (e.g. /login -> /login/index.html).

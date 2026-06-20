@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import ChatPanel from "@/components/ChatPanel";
 import NdaForm from "@/components/NdaForm";
 import NdaDocument from "@/components/NdaDocument";
 import { defaultNdaForm } from "@/lib/nda";
@@ -53,7 +54,7 @@ export default function Home() {
               Mutual NDA Creator
             </h1>
             <p className="text-sm text-slate-500">
-              Fill in the details, preview your agreement, then download a PDF.
+              Chat with the assistant to fill in your agreement, then download a PDF.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -76,7 +77,8 @@ export default function Home() {
       </header>
 
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-6 py-8 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
-        <div className="no-print">
+        <div className="no-print space-y-5">
+          <ChatPanel data={data} onChange={setData} />
           <NdaForm data={data} onChange={setData} />
         </div>
 
