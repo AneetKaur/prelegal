@@ -6,6 +6,7 @@ import {
   type ChatMessage,
   type ChatResponse,
 } from "@/lib/documents";
+import Button from "@/components/Button";
 
 interface ChatPanelProps {
   /** Chosen document, or null while the user is still picking one. */
@@ -69,9 +70,7 @@ export default function ChatPanel({
   return (
     <section className="flex h-[28rem] flex-col rounded-lg border border-slate-200 bg-white">
       <div className="border-b border-slate-200 px-5 py-3">
-        <h2 className="text-base font-semibold" style={{ color: "#032147" }}>
-          AI Assistant
-        </h2>
+        <h2 className="text-base font-semibold text-brand-navy">AI Assistant</h2>
         <p className="text-xs text-slate-500">
           {documentId
             ? "Answer my questions and I'll fill in your document."
@@ -133,14 +132,9 @@ export default function ChatPanel({
           disabled={loading}
           onChange={(e) => setInput(e.target.value)}
         />
-        <button
-          type="submit"
-          disabled={loading || !input.trim()}
-          className="rounded-md px-4 py-2 text-sm font-medium text-white transition disabled:opacity-50"
-          style={{ backgroundColor: "#753991" }}
-        >
+        <Button type="submit" disabled={loading || !input.trim()}>
           Send
-        </button>
+        </Button>
       </form>
     </section>
   );

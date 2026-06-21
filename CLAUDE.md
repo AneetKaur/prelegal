@@ -54,14 +54,19 @@ Backend available at http://localhost:8000
   - Multi-stage `Dockerfile` + `scripts/{start,stop}-{mac,linux}.sh` and `{start,stop}-windows.ps1`.
   - CI (`.github/workflows/ci.yml`): separate frontend (lint/test/build) and backend (uv + pytest) jobs.
 - **KAN-5** — AI chat for the Mutual NDA (NDA-specific field/schema approach; **superseded by KAN-7**, which generalized chat to all documents). `OPENROUTER_API_KEY` is loaded from `.env` via `python-dotenv` for local dev; start scripts pass `--env-file .env` into the container (the key is never baked into the image).
-- **KAN-7** — Expanded to **all catalog documents** via a generic, chat-driven markdown approach:
+- **KAN-7** — Expanded to **all catalog documents** via a generic, chat-driven markdown approach (merged to `main` via PR #7; ticket Done):
   - `backend/app/documents.py` loads `catalog.json` + `templates/*.md` from `DOCUMENTS_ROOT` (repo root locally; `/app` in Docker). `id` = template filename without `.md`.
   - `GET /api/catalog` lists documents; `GET /api/documents/{id}` returns the pristine template markdown (the blank starting point).
   - `POST /api/chat` (`backend/app/routes/chat.py`) has two modes branching on `documentId`: **selection** (no id → `{reply, documentId}`; suggests the closest catalog doc for unsupported requests) and **fill** (id set → the LLM returns small find/replace edits applied server-side via `apply_replacements`, returning the updated `documentMarkdown`). Full-document regeneration was tried first but is too slow/unreliable for large templates (e.g. CSA ~45KB); find/replace keeps output tiny. Uses OpenRouter (`openai/gpt-oss-120b:free`) with JSON-schema Structured Outputs, `max_tokens=8000`; LLM call isolated in `_call_openrouter` for mocking.
   - Frontend: `CatalogPicker` (grid + intake chat) → workspace with a generic `ChatPanel` (selection + fill modes), `DocumentPreview` (renders markdown via `react-markdown` + `remark-gfm` + `rehype-raw`), and a raw-markdown editor for manual edits. PDF via browser print (`.document-preview` is the print target). The NDA-specific `NdaForm`/`NdaDocument`/`NdaFields` were removed in favour of this single path.
+- **KAN-9** — Multiple users + final polish:
+  - **Real auth** (stdlib only, no new deps): `backend/app/security.py` does salted PBKDF2-SHA256 password hashing + opaque session tokens. `users` gains `password_hash`; new `sessions` table. `POST /api/register|login|logout` (`auth.py`); a `get_current_user` dependency reads `Authorization: Bearer <token>`. The DB is still throwaway (schema recreated on startup).
+  - **Document history**: new `documents` table + `/api/my-documents` CRUD (`backend/app/routes/saved.py`), all scoped to the logged-in user. Save is insert-or-update by row id. Frontend saves on an explicit **Save** button and auto-saves on **Download PDF**; the landing screen lists the user's saved documents to reopen.
+  - **Polish**: brand palette as Tailwind `@theme` tokens in `globals.css` (use `bg-brand-*`/`text-brand-*`, not inline hex); shared `frontend/src/components/Button.tsx`; sign-in/register screen with password; legal disclaimer (banner in chrome + inside `DocumentPreview` so it prints with the PDF).
+  - Frontend session in `lib/auth.ts` now stores `{token, email, name}`; `getToken()` feeds the `Authorization` header in `lib/documents.ts`.
 
 ### Not yet built
-- Real authentication / sign-up (login is intentionally fake for now).
+- Password reset / email verification (registration is immediate, no email step).
 
 ### Dev notes
 - `uv` installs to `~/.local/bin`. Run the backend locally with `uv run uvicorn app.main:app --reload` (from `backend/`); build the frontend with `npm run build` (emits `frontend/out/`, served by the backend).
