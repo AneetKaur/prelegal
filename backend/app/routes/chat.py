@@ -83,6 +83,12 @@ in `replacements`. For each edit:
   paraphrase or rewrite it), long enough to identify the place to change. Every \
   occurrence of `find` is replaced, so include surrounding context when a short \
   placeholder appears in more than one place and should differ.
+- Use plain ASCII only in `find`: straight double quotes (") exactly as written, \
+  and absolutely no zero-width or invisible characters.
+- Keep every HTML tag whole. If you change text inside a tag such as \
+  `<span class="keyterms_link">Customer</span>`, copy the ENTIRE span into `find` \
+  (opening tag, text, and closing `</span>`). Never start or end `find` in the \
+  middle of a tag.
 - `replace` is the text to substitute in.
 - To tick a checkbox, replace its "- [ ]" with "- [x]" (and untick the \
   alternative if needed).
@@ -133,12 +139,35 @@ FILL_SCHEMA = {
 }
 
 
+# Zero-width / invisible characters the LLM sometimes injects into `find`
+# (e.g. U+200B right after `class=`), which would otherwise break the match.
+_INVISIBLE = dict.fromkeys(map(ord, "​‌‍﻿"), None)
+
+
+def _clean_find(find: str) -> str:
+    return find.translate(_INVISIBLE)
+
+
+def _is_safe_find(find: str) -> bool:
+    """Only apply a find that is non-empty and keeps HTML tags whole (balanced
+    angle brackets). This blocks generic fragments like `<span class=` whose
+    replacement would corrupt every tag into `...</span>"header_2">` garbage."""
+    return bool(find) and find.count("<") == find.count(">")
+
+
 def apply_replacements(markdown: str, replacements: list[dict]) -> str:
-    """Apply each find/replace edit. A find with no match is a harmless no-op;
-    an empty find is skipped (str.replace('', x) would corrupt the document)."""
+    """Apply each find/replace edit defensively.
+
+    The LLM does not always hand back a clean, verbatim `find`: it may inject
+    zero-width characters or return a generic tag fragment. So we strip invisible
+    characters, then apply an edit only when the cleaned `find` is a real,
+    tag-balanced substring that actually changes something. Anything else is
+    skipped, so a bad edit can never corrupt the document (KAN-10)."""
     for edit in replacements:
-        if edit["find"]:
-            markdown = markdown.replace(edit["find"], edit["replace"])
+        find = _clean_find(edit.get("find", ""))
+        replace = edit.get("replace", "")
+        if find != replace and _is_safe_find(find) and find in markdown:
+            markdown = markdown.replace(find, replace)
     return markdown
 
 
