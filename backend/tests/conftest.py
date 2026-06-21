@@ -13,3 +13,19 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "test.db"))
     with TestClient(app) as c:
         yield c
+
+
+@pytest.fixture
+def register():
+    """Register a user via the API and return their bearer auth headers."""
+
+    def _register(client, email="user@example.com", password="password123", name="User"):
+        resp = client.post(
+            "/api/register",
+            json={"email": email, "password": password, "name": name},
+        )
+        assert resp.status_code == 200, resp.text
+        token = resp.json()["token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    return _register

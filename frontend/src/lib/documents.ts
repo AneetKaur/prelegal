@@ -1,9 +1,29 @@
-// Client for the document catalog and the AI chat endpoint.
+// Client for the document catalog, the AI chat endpoint, and saved documents.
+
+import { getToken } from "@/lib/auth";
 
 export interface DocumentSummary {
   id: string;
   name: string;
   description: string;
+}
+
+/** A document the user has saved (list view — no markdown body). */
+export interface SavedDocumentSummary {
+  id: number;
+  documentId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SavedDocument extends SavedDocumentSummary {
+  markdown: string;
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 export interface ChatMessage {
@@ -48,5 +68,40 @@ export async function postChat(
     body: JSON.stringify({ messages, documentId, documentMarkdown }),
   });
   if (!res.ok) throw new Error(`Chat request failed (${res.status})`);
+  return res.json();
+}
+
+// --- Saved documents ---------------------------------------------------------
+
+/** The current user's saved documents, most recently updated first. */
+export async function fetchMyDocuments(): Promise<SavedDocumentSummary[]> {
+  const res = await fetch("/api/my-documents", { headers: authHeaders() });
+  if (!res.ok) throw new Error(`Saved documents request failed (${res.status})`);
+  return res.json();
+}
+
+/** Load one saved document (including its markdown) to reopen it. */
+export async function fetchMyDocument(id: number): Promise<SavedDocument> {
+  const res = await fetch(`/api/my-documents/${id}`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(`Saved document request failed (${res.status})`);
+  return res.json();
+}
+
+/**
+ * Save the current document. Pass an `id` to update a previously saved document
+ * in place; omit it to create a new one. Returns the saved summary.
+ */
+export async function saveDocument(
+  documentId: string,
+  title: string,
+  markdown: string,
+  id?: number,
+): Promise<SavedDocumentSummary> {
+  const res = await fetch("/api/my-documents", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ id, documentId, title, markdown }),
+  });
+  if (!res.ok) throw new Error(`Save request failed (${res.status})`);
   return res.json();
 }

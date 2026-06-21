@@ -3,6 +3,13 @@
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Brand palette — exposed as utilities like bg-brand-purple, text-brand-navy. */
+  --color-brand-yellow: #ecad0a;
+  --color-brand-blue: #209dd7;
+  --color-brand-purple: #753991;
+  --color-brand-navy: #032147;
+  --color-brand-grey: #888888;
 }
 
 body {
@@ -45,6 +52,18 @@ body {
   border-collapse: collapse;
   margin: 0.75rem 0;
   width: 100%;
+}
+
+/* Legal disclaimer shown above the document; kept inside .document-preview so it
+ * is included in the printed/exported PDF. */
+.document-disclaimer {
+  margin-bottom: 1.5rem;
+  border-left: 3px solid #ecad0a;
+  background: #fdf6e3;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #5b4a13;
 }
 .document-preview th,
 .document-preview td {
