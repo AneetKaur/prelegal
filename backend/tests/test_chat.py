@@ -68,6 +68,52 @@ def test_apply_replacements_replaces_all_occurrences_and_ignores_misses():
     assert result == "Acme and Acme and [other]"
 
 
+# --- KAN-10 regression tests --------------------------------------------------
+# The LLM does not always return a clean, verbatim `find`. These encode the two
+# failure modes captured live and assert the document is never corrupted.
+
+
+def test_apply_replacements_strips_zero_width_chars_so_find_matches():
+    # The model injects a zero-width space (U+200B) into an otherwise-correct
+    # find; stripping it should let the replacement apply (PSA "nothing replaced").
+    md = '<span class="keyterms_link">Customer</span> agrees.'
+    result = chat.apply_replacements(
+        md,
+        [
+            {
+                "find": '<span class="keyterms_link">Customer​</span>',
+                "replace": '<span class="keyterms_link">Acme Inc.</span>',
+            }
+        ],
+    )
+    assert result == '<span class="keyterms_link">Acme Inc.</span> agrees.'
+
+
+def test_apply_replacements_does_not_corrupt_tags_with_generic_find():
+    # The model returns a generic, tag-splitting fragment as `find`. Applying it
+    # with str.replace would turn every `<span class="...">` into
+    # `...</span>"header_2">` garbage (the DPA symptom). It must be skipped.
+    md = '<span class="header_2">Processing</span>'
+    result = chat.apply_replacements(
+        md,
+        [{"find": "<span class=", "replace": '<span class="keyterms_link">Canada</span>'}],
+    )
+    assert result == md  # unchanged
+    assert '"header_2">' not in result.replace('class="header_2"', "")
+
+
+def test_apply_replacements_skips_no_op_and_empty_finds():
+    md = "Hello world"
+    result = chat.apply_replacements(
+        md,
+        [
+            {"find": "", "replace": "x"},
+            {"find": "world", "replace": "world"},  # no-op
+        ],
+    )
+    assert result == md
+
+
 def test_fill_mode_unknown_document_returns_404(client):
     resp = client.post(
         "/api/chat",
